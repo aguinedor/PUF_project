@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# ------------------------------------------------------------
+# Run python script to Challenge the PUF with a signal
+# -> [ _ _ _ _ _ _ _ _ ]
+
+
+
+
+# ------------------------------------------------------------
+# Run python script to Filter the data from the PUF
+
+
+
+
+
+# ------------------------------------------------------------
+# Run python script to modify the vhdl code with new challenge
+

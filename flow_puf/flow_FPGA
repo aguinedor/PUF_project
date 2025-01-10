@@ -1,0 +1,61 @@
+#!/bin/sh
+# ------------------------------------------------------------
+# Convert the vhdl code to verilog
+
+TOP="ring_oscillator"
+V_OUT_NAME="RTL/verilog/$TOP.v"
+
+
+# TODO explaine the args
+# 1 - take all the vhdl files and store them locally in .cf file
+
+#ghdl --clean
+#ghdl -i --work=unisim unisims/*.vhd
+#ghdl -i --work=unisim unisims/primitive/*.vhd
+#ghdl -i RTL/vhdl/ring_oscillator.vhd
+#ghdl -m -g -Punisim --warn-unused --ieee=synopsys ring_oscillator
+
+ghdl --clean
+ghdl -i --std=08 --work=unisim unisims/*.vhd
+ghdl -i --std=08 --work=unisim unisims/primitive/*.vhd
+ghdl -i --std=08 --work=unisim RTL/vhdl/ring_oscillator.vhd
+
+ghdl -m --std=08 --warn-unused --work=unisim $TOP
+ghdl synth --std=08 --work=unisim -Pbuild --out=verilog $TOP > $V_OUT_NAME
+
+
+# ------------------------------------------------------------
+# Process the code in Yosys to create JSON file
+
+#yosys -s flow_puf/yosys.ys
+yosys -p "
+read_verilog RTL/verilog/$TOP.v;
+synth -top ring_oscillator;
+write_json ring_oscillator.json;
+show -format svg -prefix my_design_graph ring_oscillator;
+"
+# TODO use -p command to put all commands separated with ";"
+
+# ------------------------------------------------------------
+# Process the JSON in Nextpnr-Xilinx to create FASM file
+
+# CHIPDB_DIR=/home/adrien/nextpnr-xilinx/
+
+# --json   -> input file
+# --router -> way to ordonance place and route
+
+# Specific to the architecture
+# --chipdb ->  xilinx ?                 TODO add the path to chipdb/*.bin file
+# --xdc    ->  xdc/zc706.xdc            TODO constraint file
+# --fasm   ->                           TODO check if needed ?
+# --device ->  xc7z045ffg900-2          TODO specify the target model
+
+# ./home/adrien/nextpnr-xilinx/nextpnr-xilinx -l nextpnr.log --json $TOP.json --router router1
+
+
+
+# ------------------------------------------------------------
+# Process the JSON in Nextpnr-Xilinx to create FASM file
+
+
+
