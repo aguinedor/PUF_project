@@ -2,11 +2,17 @@
 # ------------------------------------------------------------
 # Convert the vhdl code to verilog
 
-TOP="ring_oscillator"
-V_OUT_NAME="RTL/verilog/$TOP.v"
+
+STORE_DIR="sim_dir"
+NEXT_PNR_ACTIVE=0
 
 
-# TODO explain the args
+[ "$1" ] && NEXT_PNR_ACTIVE=1 && echo "Next-pnr activated: $NEXT_PNR_ACTIVE"
+
+rm -r $STORE_DIR
+[ ! -d "$STORE_DIR" ] && echo "Creating $STORE_DIR" && mkdir "$STORE_DIR"
+
+# ------------------------------------------------------------
 # 1 - take all the vhdl files and store them locally in .cf file
 
 #ghdl --clean
@@ -15,35 +21,47 @@ V_OUT_NAME="RTL/verilog/$TOP.v"
 #ghdl -i RTL/vhdl/ring_oscillator.vhd
 #ghdl -m -g -Punisim --warn-unused --ieee=synopsys ring_oscillator
 
+echo "1 - GHDL"
+
+TOP="ro_puf_s7"
+INPUT_DIR="RTL_PUF/vhdl"
+OUTPUT_DIR="RTL_PUF/verilog"
+
 ghdl --clean
-ghdl -i --std=08 --work=unisim unisims/*.vhd
-ghdl -i --std=08 --work=unisim unisims/primitive/*.vhd
-ghdl -i --std=08 --work=unisim RTL/vhdl/ring_oscillator.vhd
 
-ghdl -m --std=08 --warn-unused --work=unisim $TOP
-ghdl synth --std=08 --work=unisim -Pbuild --out=verilog $TOP > $V_OUT_NAME
+#ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/*.vhd
+#ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/primitive/*.vhd
+
+# ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/*.vhd
+# ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/primitive/*.vhd
+
+ghdl -i --std=08 -fsynopsys --workdir=$STORE_DIR --work=unisim $INPUT_DIR/*.vhd
+
+ghdl -m --std=08 -fsynopsys --warn-all --work=unisim --workdir=$STORE_DIR $TOP
+ghdl synth --latches --std=08 -fsynopsys --work=unisim --workdir=$STORE_DIR --out=verilog $TOP > $OUTPUT_DIR/$TOP.v
 
 
 # ------------------------------------------------------------
-# Process the code in Yosys to create JSON file
-
-#yosys -s flow_puf/yosys.ys
-yosys -p "
-read_verilog RTL/verilog/$TOP.v;
-show -format svg -prefix my_design_graph_before ring_oscillator;
-synth -top ring_oscillator;
-write_json ring_oscillator.json;
-show -format svg -prefix my_design_graphafter ring_oscillator;
-"
+# 2 - Process the code in Yosys to create JSON file
 # usage of -p command to put all commands separated with ";"
+#yosys -s flow_puf/yosys.ys
+echo "2 - yosys"
+
+# yosys -p "
+#     read_verilog $OUTPUT_DIR/$TOP.v;
+#     show -format svg -prefix $STORE_DIR/my_design_graph_before $TOP;
+#     synth -top $TOP;
+#     write_json $STORE_DIR/$TOP.json;
+#     show -format svg -prefix $STORE_DIR/my_design_graphafter $TOP;
+# "
+
 
 # ------------------------------------------------------------
-# Process the JSON in Nextpnr-Xilinx to create FASM file
-
+# 3 - Process the JSON in Nextpnr-Xilinx to create FASM file
+# When cloning nextpnr, don't forget to do git submodule update --recursive --remote
 
 # Generate binary file for xc7s50csga324-1
-#don't forget to do git submodule update --recursive --remote
-#python3 ./xilinx/python/bbaexport.py --device xc7s50csga324-1 --bba xilinx/xc7s50csga324-1.bba
+# python3 ./xilinx/python/bbaexport.py --device xc7s50csga324-1 --bba xilinx/xc7s50csga324-1.bba
 #./bba/bbasm --l xilinx/xc7s50csga324-1.bba xilinx/xc7s50csga324-1.bin
 
 # --json   -> input file
@@ -55,19 +73,22 @@ show -format svg -prefix my_design_graphafter ring_oscillator;
 # --fasm   ->                           TODO check if needed ?
 # --device ->  xc7s50csga324-1
 
-#
-
 #================================================
 # Routing with nextpnr-xilinx (experimental)
 #================================================
 
 
-CHIPDB ?= /home/adrien/nextpnr-xilinx/xilinx/xc7s50csga324-1.bin
-FILENAME_NETLIST = ro_puf.json
-FILENAME_ROUTED  = ro_puf_routed.json
-FILENAME_FASM    = ro_puf.fasm
+if [ "$NEXT_PNR_ACTIVE" -eq 1 ]; then
+    echo "3 - next-pnr Xilinx"
+    CHIPDB=/home/adrien/nextpnr-xilinx/xilinx/xc7s50csga324-1.bin
+    FILENAME_NETLIST=ro_puf.json
+    FILENAME_ROUTED=ro_puf_routed.json
+    FILENAME_FASM=ro_puf.fasm
 
-nextpnr-xilinx -l nextpnr.log --chipdb $(CHIPDB) --xdc $(XDC) --json $(FILENAME_NETLIST)  --write $(FILENAME_ROUTED) --fasm $(FILENAME_FASM) --router router1
+    nextpnr-xilinx -l nextpnr.log --chipdb $(CHIPDB) --xdc $(XDC)\
+    --json $(FILENAME_NETLIST)  --write $(FILENAME_ROUTED)\
+    --fasm $(FILENAME_FASM) --router router1
+fi
 
 
 # ------------------------------------------------------------
