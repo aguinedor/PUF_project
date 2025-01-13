@@ -50,12 +50,12 @@ show -format svg -prefix my_design_graphafter ring_oscillator;
 # --router -> way to ordonance place and route
 
 # Specific to the architecture
-# --chipdb ->  xc7s50csga324-1.bin      (/home/adrien/nextpnr-xilinx/xilinx/)    
+# --chipdb ->  xc7s50csga324-1.bin      (/home/adrien/nextpnr-xilinx/xilinx/)
 # --xdc    ->  xdc/xc7s50csga324-1.xdc  TODO constraint file
 # --fasm   ->                           TODO check if needed ?
-# --device ->  xc7s50csga324-1         
+# --device ->  xc7s50csga324-1
 
-# 
+#
 
 #================================================
 # Routing with nextpnr-xilinx (experimental)
