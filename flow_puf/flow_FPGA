@@ -39,19 +39,34 @@ show -format svg -prefix my_design_graph ring_oscillator;
 # ------------------------------------------------------------
 # Process the JSON in Nextpnr-Xilinx to create FASM file
 
-# CHIPDB_DIR=/home/adrien/nextpnr-xilinx/
+
+# Generate binary file for xc7s50csga324-1
+#don't forget to do git submodule update --recursive --remote
+#python3 ./xilinx/python/bbaexport.py --device xc7s50csga324-1 --bba xilinx/xc7s50csga324-1.bba
+#./bba/bbasm --l xilinx/xc7s50csga324-1.bba xilinx/xc7s50csga324-1.bin
 
 # --json   -> input file
 # --router -> way to ordonance place and route
 
 # Specific to the architecture
-# --chipdb ->  xilinx ?                 TODO add the path to chipdb/*.bin file
-# --xdc    ->  xdc/zc706.xdc            TODO constraint file
+# --chipdb ->  xc7s50csga324-1.bin      (/home/adrien/nextpnr-xilinx/xilinx/)    
+# --xdc    ->  xdc/xc7s50csga324-1.xdc  TODO constraint file
 # --fasm   ->                           TODO check if needed ?
-# --device ->  xc7z045ffg900-2          TODO specify the target model
+# --device ->  xc7s50csga324-1         
 
-# ./home/adrien/nextpnr-xilinx/nextpnr-xilinx -l nextpnr.log --json $TOP.json --router router1
+# 
 
+#================================================
+# Routing with nextpnr-xilinx (experimental)
+#================================================
+
+
+CHIPDB ?= /home/adrien/nextpnr-xilinx/xilinx/xc7s50csga324-1.bin
+FILENAME_NETLIST = ro_puf.json
+FILENAME_ROUTED  = ro_puf_routed.json
+FILENAME_FASM    = ro_puf.fasm
+
+nextpnr-xilinx -l nextpnr.log --chipdb $(CHIPDB) --xdc $(XDC) --json $(FILENAME_NETLIST)  --write $(FILENAME_ROUTED) --fasm $(FILENAME_FASM) --router router1
 
 
 # ------------------------------------------------------------
