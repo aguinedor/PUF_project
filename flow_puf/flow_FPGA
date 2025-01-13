@@ -6,7 +6,7 @@ TOP="ring_oscillator"
 V_OUT_NAME="RTL/verilog/$TOP.v"
 
 
-# TODO explaine the args
+# TODO explain the args
 # 1 - take all the vhdl files and store them locally in .cf file
 
 #ghdl --clean
@@ -30,11 +30,12 @@ ghdl synth --std=08 --work=unisim -Pbuild --out=verilog $TOP > $V_OUT_NAME
 #yosys -s flow_puf/yosys.ys
 yosys -p "
 read_verilog RTL/verilog/$TOP.v;
+show -format svg -prefix my_design_graph_before ring_oscillator;
 synth -top ring_oscillator;
 write_json ring_oscillator.json;
-show -format svg -prefix my_design_graph ring_oscillator;
+show -format svg -prefix my_design_graphafter ring_oscillator;
 "
-# TODO use -p command to put all commands separated with ";"
+# usage of -p command to put all commands separated with ";"
 
 # ------------------------------------------------------------
 # Process the JSON in Nextpnr-Xilinx to create FASM file
