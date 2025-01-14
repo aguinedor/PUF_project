@@ -1,63 +1,135 @@
 #!/bin/sh
-# ------------------------------------------------------------
-# Convert the vhdl code to verilog
-
-
+# ------------------------------------------------------------------------------------------------------------------------
+# 0 - Configuration option declaration
+# ------------------------------------------------------------------------------------------------------------------------
+GHDL_ON=0
+YOSYS_IS_ON=0
+NEXT_PNR_IS_ON=0
+CLEAN_IS_ON=0
 STORE_DIR="sim_dir"
-NEXT_PNR_ACTIVE=0
-
-
-[ "$1" ] && NEXT_PNR_ACTIVE=1 && echo "Next-pnr activated: $NEXT_PNR_ACTIVE"
-
-rm -r $STORE_DIR
-[ ! -d "$STORE_DIR" ] && echo "Creating $STORE_DIR" && mkdir "$STORE_DIR"
-
-# ------------------------------------------------------------
-# 1 - take all the vhdl files and store them locally in .cf file
-
-#ghdl --clean
-#ghdl -i --work=unisim unisims/*.vhd
-#ghdl -i --work=unisim unisims/primitive/*.vhd
-#ghdl -i RTL/vhdl/ring_oscillator.vhd
-#ghdl -m -g -Punisim --warn-unused --ieee=synopsys ring_oscillator
-
-echo "1 - GHDL"
-
+# Design options
 TOP="ro_puf_s7"
 INPUT_DIR="RTL_PUF/vhdl"
 OUTPUT_DIR="RTL_PUF/verilog"
 
-ghdl --clean
 
-#ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/*.vhd
-#ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/primitive/*.vhd
-
-# ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/*.vhd
-# ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/primitive/*.vhd
-
-ghdl -i --std=08 -fsynopsys --workdir=$STORE_DIR --work=unisim $INPUT_DIR/*.vhd
-
-ghdl -m --std=08 -fsynopsys --warn-all --work=unisim --workdir=$STORE_DIR $TOP
-ghdl synth --latches --std=08 -fsynopsys --work=unisim --workdir=$STORE_DIR --out=verilog $TOP > $OUTPUT_DIR/$TOP.v
-
+# ------------------------------------------------------------------------------------------------------------------------
+# 0 - Initialization script
+# ------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------
+# - Case to activate parts of script
+for arg in "$@"; do
+    case $arg in
+        --ghdl)
+            GHDL_ON=1
+            echo "GHDL activated: $GHDL_ON"
+            ;;
+        --yosys)
+            YOSYS_IS_ON=1
+            echo "Yosys activated: $YOSYS_IS_ON"
+            ;;
+        --clean)
+            CLEAN_IS_ON=1
+            echo "Clean activated: $CLEAN_IS_ON"
+            ;;
+        --nextpnr)
+            NEXT_PNR_IS_ON=1
+            echo "Next-pnr activated: $NEXT_PNR_IS_ON"
+            ;;
+        *)
+            echo "Unknown option: $arg"
+            ;;
+    esac
+done
 
 # ------------------------------------------------------------
+# - Check if user want to continue
+echo -e "Script section activation : \n"
+echo    "--ghdl    is on : $GHDL_ON"
+echo    "--yosys   is on : $YOSYS_IS_ON"
+echo    "--nextpnr is on : $NEXT_PNR_IS_ON"
+echo    "--clean   is on : $CLEAN_IS_ON"
+
+echo -e "top_name        : $TOP"
+echo    "store_dir       : $STORE_DIR"
+echo    "input_dir       : $INPUT_DIR"
+
+echo -e "\nDo you want to continue? (y/n)"
+read -r user_input
+
+# - Exit early if the input is not "y" or "Y"
+if [ "$user_input" != "y" ] && [ "$user_input" != "Y" ]; then
+    echo "Exiting the program."
+else
+
+# ------------------------------------------------------------
+# - Remove sim directory
+if [ "$CLEAN_IS_ON" -eq 1 ]; then
+    rm -rf $STORE_DIR
+fi
+
+[ ! -d "$STORE_DIR" ] && echo -e "\nCreating $STORE_DIR" && mkdir "$STORE_DIR"
+
+LOG_FILE="$STORE_DIR/flow_FPGA.log"
+rm -rf $LOG_FILE
+touch $LOG_FILE
+
+
+# ------------------------------------------------------------------------------------------------------------------------
+# 1 - take all the vhdl files and store them locally in .cf file
+#     It is located in $STORE_DIR
+# ------------------------------------------------------------------------------------------------------------------------
+
+if [ "$GHDL_ON" -eq 1 ]; then
+    echo -e "\n1 - GHDL"
+    ghdl --clean
+
+    # ---------- Old version
+    # ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/*.vhd
+    # ghdl -i --std=08 --workdir=$STORE_DIR --work=unisim unisims/primitive/*.vhd
+    # ghdl -i --std=08 -fsynopsys --workdir=$STORE_DIR --work=unisim $INPUT_DIR/*.vhd
+    # ghdl -m --std=08 -fsynopsys --warn-all --work=unisim --workdir=$STORE_DIR $TOP
+
+    # ---------- New version
+    # TODO Difference STORE_DIR
+    ghdl analyze --std=08 -fsynopsys --workdir=$STORE_DIR $INPUT_DIR/*vhd
+    ghdl synth --std=08 -fsynopsys --workdir=$STORE_DIR --out=verilog $TOP > $STORE_DIR/$TOP.v
+fi
+
+# Carefull at the end the verilog output file isn't correct.
+# There is two main problems :
+#   - rom_data_out variable instantiated 2 times
+#   - uut1_\output is declared for 1 & 2 with "\" which leads to an error
+#   - the "\" character should be remove
+
+
+
+# ------------------------------------------------------------------------------------------------------------------------
 # 2 - Process the code in Yosys to create JSON file
-# usage of -p command to put all commands separated with ";"
-#yosys -s flow_puf/yosys.ys
-echo "2 - yosys"
+# ------------------------------------------------------------------------------------------------------------------------
 
-# yosys -p "
-#     read_verilog $OUTPUT_DIR/$TOP.v;
-#     show -format svg -prefix $STORE_DIR/my_design_graph_before $TOP;
-#     synth -top $TOP;
-#     write_json $STORE_DIR/$TOP.json;
-#     show -format svg -prefix $STORE_DIR/my_design_graphafter $TOP;
-# "
+if [ "$YOSYS_IS_ON" -eq 1 ]; then
+    echo -e "\n2 - Yosys"
 
+    # ---------- Old version
+    # usage of -p command to put all commands separated with ";"
+    # yosys -s flow_puf/yosys.ys
+    # show -format svg -prefix $STORE_DIR/my_design_graph_before $TOP;
+    # show -format svg -prefix $STORE_DIR/my_design_graphafter $TOP;
 
-# ------------------------------------------------------------
+    # ---------- New version
+    yosys -p "
+        read_verilog $OUTPUT_DIR/$TOP.v;
+        synth_xilinx -flatten -nowidelut -arch xc7 -top $TOP;
+        json -o $STORE_DIR/$TOP.json $TOP;
+    " | tee -a $LOG_FILE
+fi
+
+# ------------------------------------------------------------------------------------------------------------------------
 # 3 - Process the JSON in Nextpnr-Xilinx to create FASM file
+# ------------------------------------------------------------------------------------------------------------------------
+
+
 # When cloning nextpnr, don't forget to do git submodule update --recursive --remote
 
 # Generate binary file for xc7s50csga324-1
@@ -78,21 +150,21 @@ echo "2 - yosys"
 #================================================
 
 
-if [ "$NEXT_PNR_ACTIVE" -eq 1 ]; then
-    echo "3 - next-pnr Xilinx"
-    CHIPDB=/home/adrien/nextpnr-xilinx/xilinx/xc7s50csga324-1.bin
-    FILENAME_NETLIST=ro_puf.json
-    FILENAME_ROUTED=ro_puf_routed.json
-    FILENAME_FASM=ro_puf.fasm
+if [ "$NEXT_PNR_IS_ON" -eq 1 ]; then
+    echo -e "\n3 - next-pnr Xilinx"
 
-    nextpnr-xilinx -l nextpnr.log --chipdb $(CHIPDB) --xdc $(XDC)\
-    --json $(FILENAME_NETLIST)  --write $(FILENAME_ROUTED)\
-    --fasm $(FILENAME_FASM) --router router1
+    NEXT_PNR_PATH=./home/adrien/nextpnr-xilinx/nextpnr-xilinx
+    CHIPDB=flow_puf/xc7s50csga324-1.bin
+    FILENAME_NETLIST=$STORE_DIR/ro_puf_s7.json
+    FILENAME_ROUTED=$STORE_DIR/ro_puf_s7_routed.json
+    FILENAME_FASM=$STORE_DIR/ro_puf_7.fasm
+    XDC=flow_puf/ro_puf_new.xdc
+
+    ./../nextpnr-xilinx/nextpnr-xilinx -l nextpnr.log --chipdb $CHIPDB  --xdc $XDC --json $FILENAME_NETLIST  --write $FILENAME_ROUTED --fasm $FILENAME_FASM --router router1
 fi
 
 
 # ------------------------------------------------------------
 # Process the JSON in Nextpnr-Xilinx to create FASM file
 
-
-
+fi
