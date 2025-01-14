@@ -13,7 +13,10 @@ set_property IOSTANDARD LVCMOS33 [get_ports reset_btn]
 #set_property -dict {PACKAGE_PIN R12 IOSTANDARD LVCMOS33} [get_ports uart_rx]
 # UART through IO's
 set_property PACKAGE_PIN M14     [get_ports uart_tx]
+set_property IOSTANDARD LVCMOS33 [get_ports uart_tx]
+set_property PACKAGE_PIN N14     [get_ports uart_rx]
 set_property IOSTANDARD LVCMOS33 [get_ports uart_rx]
+
 # Leds assignation
 set_property PACKAGE_PIN E18     [get_ports led1]
 set_property IOSTANDARD LVCMOS33 [get_ports led1]

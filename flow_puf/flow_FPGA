@@ -155,14 +155,16 @@ fi
 if [ "$NEXT_PNR_IS_ON" -eq 1 ]; then
     echo -e "\n3 - next-pnr Xilinx"
 
-    NEXT_PNR_PATH=./home/adrien/nextpnr-xilinx/nextpnr-xilinx
     CHIPDB=flow_puf/xc7s50csga324-1.bin
     FILENAME_NETLIST=$STORE_DIR/ro_puf_s7.json
     FILENAME_ROUTED=$STORE_DIR/ro_puf_s7_routed.json
     FILENAME_FASM=$STORE_DIR/ro_puf_7.fasm
     XDC=flow_puf/ro_puf_new.xdc
 
-    ./../nextpnr-xilinx/nextpnr-xilinx -l nextpnr.log --chipdb $CHIPDB  --xdc $XDC --json $FILENAME_NETLIST  --write $FILENAME_ROUTED --fasm $FILENAME_FASM --router router1
+    ./../nextpnr-xilinx/nextpnr-xilinx -l $STORE_DIR/nextpnr.log \
+    -v --debug --no-tmdriv --freq 12  --ignore-rel-clk --ignore-loops --chipdb $CHIPDB \
+    --xdc $XDC --json $FILENAME_NETLIST  --write $FILENAME_ROUTED \
+    --fasm $FILENAME_FASM --router router1
 fi
 
 
