@@ -2,24 +2,24 @@ module ring_oscillator
   (input  enable,
    output ro_out);
   reg [6:0] inverters;
-  wire nand_out;
-  wire n11036_o;
-  wire n11037_o;
-  wire n11042_o;
-  wire n11046_o;
-  wire n11049_o;
-  wire n11053_o;
-  wire n11056_o;
-  wire n11060_o;
-  wire n11063_o;
-  wire n11067_o;
-  wire n11070_o;
-  wire n11074_o;
-  wire n11077_o;
-  wire n11081_o;
-  wire n11084_o;
-  wire n11086_o;
-  wire [6:0] n11087_o;
+  (* KEEP="TRUE" *) wire nand_out;
+  (* KEEP="TRUE" *) wire n11036_o;
+  (* KEEP="TRUE" *) wire n11037_o;
+  (* KEEP="TRUE" *) wire n11042_o;
+  (* KEEP="TRUE" *) wire n11046_o;
+  (* KEEP="TRUE" *) wire n11049_o;
+  (* KEEP="TRUE" *) wire n11053_o;
+  (* KEEP="TRUE" *) wire n11056_o;
+  (* KEEP="TRUE" *) wire n11060_o;
+  (* KEEP="TRUE" *) wire n11063_o;
+  (* KEEP="TRUE" *) wire n11067_o;
+  (* KEEP="TRUE" *) wire n11070_o;
+  (* KEEP="TRUE" *) wire n11074_o;
+  (* KEEP="TRUE" *) wire n11077_o;
+  (* KEEP="TRUE" *) wire n11081_o;
+  (* KEEP="TRUE" *) wire n11084_o;
+  (* KEEP="TRUE" *) wire n11086_o;
+  (* KEEP="TRUE" *) wire [6:0] n11087_o;
   assign ro_out = n11086_o;
   /* RTL_PUF/vhdl/ring_oscillator_no_lut.vhd:16:12  */
   always @*
@@ -12990,11 +12990,10 @@ module ro_puf_s7
   localparam n187_o = 1'b0;
   localparam n188_o = 1'b0;
   wire uut1_n189;
-  wire uut1_\output ;
+  wire uut1_output ;
   wire uut2_n192;
-  wire uut2_\output ;
+  wire uut2_output ;
   wire [15:0] rom_n195;
-  wire [15:0] rom_data_out;
   wire n201_o;
   wire n203_o;
   wire n205_o;
@@ -17630,19 +17629,19 @@ module ro_puf_s7
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:282:30  */
   assign n186_o = output_data[2:0];
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:297:18  */
-  assign uut1_n189 = uut1_\output ; // (signal)
+  assign uut1_n189 = uut1_output ; // (signal)
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:294:1  */
   ros_selection uut1 (
     .challenge(mux_1_challenge),
     .enable(enable_1),
-    .\output (uut1_\output ));
+    .\output (uut1_output ));
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:305:18  */
-  assign uut2_n192 = uut2_\output ; // (signal)
+  assign uut2_n192 = uut2_output ; // (signal)
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:302:1  */
   ros_selection uut2 (
     .challenge(mux_2_challenge),
     .enable(enable_2),
-    .\output (uut2_\output ));
+    .\output (uut2_output ));
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:312:17  */
   assign rom_n195 = rom_data_out; // (signal)
   /* RTL_PUF/vhdl/ro_puf_s7.vhd:309:1  */

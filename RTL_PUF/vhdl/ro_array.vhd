@@ -41,19 +41,17 @@ Inverseur: for i in 0 to 255 generate
                 );
 end generate Inverseur;
 -----------------------------------------------------------------------------------------
-process(challenge,Sortie_RO)
-    variable found_match : boolean := false;
+process(challenge, Sortie_RO)
 begin
+    -- Définir une valeur par défaut pour Output
+    Output <= '0';
+
     for i in 0 to 255 loop
         if challenge = std_logic_vector(to_unsigned(i, 8)) then
             Output <= Sortie_RO(i);
-            found_match := true;
-            exit;
+            exit; -- Quitter la boucle dès qu'une correspondance est trouvée
         end if;
     end loop;
-    if not found_match then
-        Output <= '0';
-    end if;
 end process;
 
 

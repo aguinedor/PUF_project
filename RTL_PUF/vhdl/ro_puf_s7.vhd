@@ -35,7 +35,7 @@ end ro_puf_s7;
 
 architecture Behavioral of ro_puf_s7 is
 
-
+attribute keep : string;
 
 --------------------------------------------------------------------------------------------------------------------
 -- Internal signals declaration
@@ -55,7 +55,14 @@ type SHIFT_Transmission_State is (IDLE, SHIFT);
 signal shift_state   : SHIFT_Transmission_State := IDLE;
 signal output_data   : std_logic_vector(7 downto 0):= (others => '0');
 
-
+attribute keep of rx_busy       : signal is "true";
+attribute keep of received_word : signal is "true";
+attribute keep of rdy           : signal is "true";
+attribute keep of tx_en         : signal is "true";
+attribute keep of tx_busy       : signal is "true";
+attribute keep of tx_data_in    : signal is "true";
+attribute keep of shift_state   : signal is "true";
+attribute keep of output_data   : signal is "true";
 
 --------------------------------------------------------------------------------------------------------------------
 -- Internal components declaration
@@ -136,7 +143,36 @@ signal state : t_state;
 
 type uart_state is (uart_IDLE, uart_State_0, uart_State_1, uart_State_2, uart_State_3, uart_State_4,uart_State_5, uart_State_6, uart_State_7, uart_State_8, uart_State_9, uart_State_10, uart_State_11, uart_State_12, uart_State_13, uart_State_14, uart_State_15);
 signal Transmission_State       : uart_state := uart_IDLE;
---------------------------------------------------------------------------------------------------------------------
+
+attribute keep of Internal_Challenge_mux : signal is "true";
+attribute keep of PUF_Response           : signal is "true";
+attribute keep of PUF_start              : signal is "true";
+attribute keep of MUX_1_challenge        : signal is "true";
+attribute keep of MUX_2_challenge        : signal is "true";
+attribute keep of MUX_1_OUT              : signal is "true";
+attribute keep of MUX_2_OUT              : signal is "true";
+attribute keep of compteur_cycles        : signal is "true";
+attribute keep of MUX_1_Counter          : signal is "true";
+attribute keep of MUX_2_Counter          : signal is "true";
+
+attribute keep of Enable_1               : signal is "true";
+attribute keep of Enable_2               : signal is "true";
+attribute keep of Reset_Counter          : signal is "true";
+attribute keep of Enable_Comparison      : signal is "true";
+attribute keep of Enable_Counter         : signal is "true";
+
+attribute keep of data_valid             : signal is "true";
+attribute keep of tx_available           : signal is "true";
+attribute keep of Counter_Timer          : signal is "true";
+attribute keep of Timer_size             : signal is "true";
+attribute keep of ro_filter              : signal is "true";
+attribute keep of rom_address            : signal is "true";
+attribute keep of rom_data_out           : signal is "true";
+attribute keep of mode_select            : signal is "true";
+
+attribute keep of state                  : signal is "true";
+attribute keep of Transmission_State     : signal is "true";
+-----------------------------------------------------------------------------------------------------
 --
 --                                              UART SECTION
 --
@@ -376,148 +412,110 @@ end process;
 process(clk)
 begin
     if rising_edge(clk) then
+        if reset_btn = '0' then -- Réinitialisation de la machine d'état lors du reset
+            state <= IDLE;
+        else
+            if mode_select = '0' then                                       -- PEAR TO PEAR MODE
+                MUX_1_challenge <=  Internal_Challenge_mux(7 downto 0) ;
+                MUX_2_challenge  <= Internal_Challenge_mux(7 downto 0);
+            else                                                            -- RANDOM MODE
+                MUX_1_challenge <=  rom_data_out(15 downto 8) ;
+                MUX_2_challenge  <= rom_data_out(7 downto 0) ;
+            end if;
 
-        if mode_select = '0' then                                       -- PEAR TO PEAR MODE
-            MUX_1_challenge <=  Internal_Challenge_mux(7 downto 0) ;
-            MUX_2_challenge  <= Internal_Challenge_mux(7 downto 0);
-        else                                                            -- RANDOM MODE
-            MUX_1_challenge <=  rom_data_out(15 downto 8) ;
-            MUX_2_challenge  <= rom_data_out(7 downto 0) ;
-        end if;
-
-        case state is
-            when IDLE =>
-                ledR_1            <= '1';
-                ledG_1            <= '1';
-                ledB_1            <= '1';
+            case state is
+                when IDLE =>
+                    ledR_1            <= '1';
+                    ledG_1            <= '1';
+                    ledB_1            <= '1';
 
 
-                Enable_Comparison <= '0';
-                Enable_Counter    <= '0';
-                Reset_Counter     <= '1';
-                Enable_1            <= (others => '0');
-                Enable_2            <= (others => '0');
+                    Enable_Comparison <= '0';
+                    Enable_Counter    <= '0';
+                    Reset_Counter     <= '1';
+                    Enable_1            <= (others => '0');
+                    Enable_2            <= (others => '0');
 
-                -- reset challenges
-                rom_address             <= 0;
-                Internal_Challenge_mux <= (others => '0');
+                    -- reset challenges
+                    rom_address             <= 0;
+                    Internal_Challenge_mux <= (others => '0');
 
-                if PUF_start = '1' then
-                    if mode_select = '0' then
-                        if ro_filter(to_integer(unsigned(Internal_Challenge_mux))) = '1' then
-                            state <= COUNTING;
+                    if PUF_start = '1' then
+                        if mode_select = '0' then
+                            if ro_filter(to_integer(unsigned(Internal_Challenge_mux))) = '1' then
+                                state <= COUNTING;
+                            else
+                                state <= CHALLENGE_INCREMENTATION;
+                            end if;
                         else
-                            state <= CHALLENGE_INCREMENTATION;
+                            if ro_filter(rom_address) = '1' then
+                                state <= COUNTING;
+                            else
+                                state <= CHALLENGE_INCREMENTATION;
+                            end if;
                         end if;
                     else
-                        if ro_filter(rom_address) = '1' then
-                            state <= COUNTING;
-                        else
-                            state <= CHALLENGE_INCREMENTATION;
-                        end if;
-                    end if;
-                else
-                    state <= IDLE;
-                end if;
-
-
-            when COUNTING =>
-                ledR_1            <= '1';
-                ledG_1            <= '0';
-                ledB_1            <= '0';
-
-                Enable_Comparison <= '0';
-                Enable_Counter    <= '1';
-                Reset_Counter     <= '0';
-
-                if mode_select = '0' then
-                    Enable_1(to_integer(unsigned(Internal_Challenge_mux))) <= '1';
-                    Enable_2(to_integer(unsigned(Internal_Challenge_mux))) <= '1';
-                else
-                    Enable_1(to_integer(unsigned(rom_data_out(15 downto 8)))) <= '1';
-                    Enable_2(to_integer(unsigned(rom_data_out(7 downto 0)))) <= '1';
-                end if;
-
-
-                if compteur_cycles = Timer_size then
-                    state <= WAIT_SEND;
-                else
-                    state <= COUNTING;
-                end if;
-
-            when WAIT_SEND =>
-                ledR_1            <= '1';
-                ledG_1            <= '0';
-                ledB_1            <= '1';
-
-                Enable_Comparison <= '0';
-                Enable_Counter    <= '0';
-                Reset_Counter     <= '0';
-                Enable_1 <= (others => '0');
-                Enable_2 <= (others => '0');
-
-
-                if tx_available = '1' then
-                    state <= COMPARISON;
-                else
-                    state <= WAIT_SEND;
-                end if;
-
-            when COMPARISON =>
-                ledR_1            <= '0';
-                ledG_1            <= '0';
-                ledB_1            <= '1';
-
-                Enable_Comparison <= '1';
-                Enable_Counter    <= '0';
-                Reset_Counter     <= '0';
-
-                if mode_select = '0' then
-                    if Internal_Challenge_mux = "11111111" then
                         state <= IDLE;
-                    else
-                        state <= CHALLENGE_INCREMENTATION;
                     end if;
-			    else
-                    if rom_address = 255 then
-                         state <= IDLE;
+
+
+                when COUNTING =>
+                    ledR_1            <= '1';
+                    ledG_1            <= '0';
+                    ledB_1            <= '0';
+
+                    Enable_Comparison <= '0';
+                    Enable_Counter    <= '1';
+                    Reset_Counter     <= '0';
+
+                    if mode_select = '0' then
+                        Enable_1(to_integer(unsigned(Internal_Challenge_mux))) <= '1';
+                        Enable_2(to_integer(unsigned(Internal_Challenge_mux))) <= '1';
                     else
-                        state <= CHALLENGE_INCREMENTATION;
+                        Enable_1(to_integer(unsigned(rom_data_out(15 downto 8)))) <= '1';
+                        Enable_2(to_integer(unsigned(rom_data_out(7 downto 0)))) <= '1';
                     end if;
-                end if;
-
-			when CHALLENGE_INCREMENTATION =>
-				if mode_select = '0'then
-					Internal_Challenge_mux <= Internal_Challenge_mux + 1;
-				else
-					rom_address <= rom_address + 1;
-				end if;
-
-				state <= CHALLENGE;
 
 
-            when CHALLENGE =>
-				ledR_1            <= '0';
-                ledG_1            <= '1';
-                ledB_1            <= '0';
-
-                Enable_Comparison <= '0';
-                Enable_Counter    <= '0';
-                Reset_Counter     <= '1';
-
-                if mode_select = '0' then
-                    if ro_filter(to_integer(unsigned(Internal_Challenge_mux))) = '1' then
+                    if compteur_cycles = Timer_size then
+                        state <= WAIT_SEND;
+                    else
                         state <= COUNTING;
+                    end if;
+
+                when WAIT_SEND =>
+                    ledR_1            <= '1';
+                    ledG_1            <= '0';
+                    ledB_1            <= '1';
+
+                    Enable_Comparison <= '0';
+                    Enable_Counter    <= '0';
+                    Reset_Counter     <= '0';
+                    Enable_1 <= (others => '0');
+                    Enable_2 <= (others => '0');
+
+
+                    if tx_available = '1' then
+                        state <= COMPARISON;
                     else
+                        state <= WAIT_SEND;
+                    end if;
+
+                when COMPARISON =>
+                    ledR_1            <= '0';
+                    ledG_1            <= '0';
+                    ledB_1            <= '1';
+
+                    Enable_Comparison <= '1';
+                    Enable_Counter    <= '0';
+                    Reset_Counter     <= '0';
+
+                    if mode_select = '0' then
                         if Internal_Challenge_mux = "11111111" then
                             state <= IDLE;
                         else
                             state <= CHALLENGE_INCREMENTATION;
                         end if;
-                    end if;
-                else
-                    if ro_filter(rom_address) = '1' then
-                        state <= COUNTING;
                     else
                         if rom_address = 255 then
                             state <= IDLE;
@@ -525,8 +523,49 @@ begin
                             state <= CHALLENGE_INCREMENTATION;
                         end if;
                     end if;
-                end if;
-        end case;
+
+                when CHALLENGE_INCREMENTATION =>
+                    if mode_select = '0'then
+                        Internal_Challenge_mux <= Internal_Challenge_mux + 1;
+                    else
+                        rom_address <= rom_address + 1;
+                    end if;
+
+                    state <= CHALLENGE;
+
+
+                when CHALLENGE =>
+                    ledR_1            <= '0';
+                    ledG_1            <= '1';
+                    ledB_1            <= '0';
+
+                    Enable_Comparison <= '0';
+                    Enable_Counter    <= '0';
+                    Reset_Counter     <= '1';
+
+                    if mode_select = '0' then
+                        if ro_filter(to_integer(unsigned(Internal_Challenge_mux))) = '1' then
+                            state <= COUNTING;
+                        else
+                            if Internal_Challenge_mux = "11111111" then
+                                state <= IDLE;
+                            else
+                                state <= CHALLENGE_INCREMENTATION;
+                            end if;
+                        end if;
+                    else
+                        if ro_filter(rom_address) = '1' then
+                            state <= COUNTING;
+                        else
+                            if rom_address = 255 then
+                                state <= IDLE;
+                            else
+                                state <= CHALLENGE_INCREMENTATION;
+                            end if;
+                        end if;
+                    end if;
+            end case;
+        end if;
     end if;
 end process;
 
@@ -588,12 +627,14 @@ begin
                 --led3 <= '0';
                 --led4 <= '1';
                 PUF_Response(63) <= '0';
+                PUF_Response(62) <= '0';
                 PUF_Response(61 downto 31) <= std_logic_vector(MUX_1_Counter);
                 PUF_Response(30 downto 0)  <= std_logic_vector(MUX_2_Counter);
             else
                 --led3 <= '1';
                 --led4 <= '0';
                 PUF_Response(63) <= '1';
+                PUF_Response(62) <= '0';
                 PUF_Response(61 downto 31) <= std_logic_vector(MUX_1_Counter);
                 PUF_Response(30 downto 0)  <= std_logic_vector(MUX_2_Counter);
             end if;
