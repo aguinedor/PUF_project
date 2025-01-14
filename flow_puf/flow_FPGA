@@ -108,6 +108,7 @@ fi
 # 2 - Process the code in Yosys to create JSON file
 # ------------------------------------------------------------------------------------------------------------------------
 
+
 if [ "$YOSYS_IS_ON" -eq 1 ]; then
     echo -e "\n2 - Yosys"
 
@@ -145,6 +146,7 @@ fi
 # --fasm   ->                           TODO check if needed ?
 # --device ->  xc7s50csga324-1
 
+
 #================================================
 # Routing with nextpnr-xilinx (experimental)
 #================================================
@@ -164,7 +166,11 @@ if [ "$NEXT_PNR_IS_ON" -eq 1 ]; then
 fi
 
 
+
+
 # ------------------------------------------------------------
 # Process the JSON in Nextpnr-Xilinx to create FASM file
 
+
 fi
+
