@@ -121,7 +121,7 @@ signal compteur_cycles          : unsigned(28 downto 0):= (others => '0');
 signal MUX_1_Counter            : unsigned(30 downto 0) := (others => '0');
 signal MUX_2_Counter            : unsigned(30 downto 0) := (others => '0');
 -- Change to a 256 bits vector to choose which ROs to activate
-signal Enable_1                   : std_logic_vector(255 downto 0) := (others => '0');
+signal Enable_1                 : std_logic_vector(255 downto 0) := (others => '0');
 signal Enable_2                 : std_logic_vector(255 downto 0) := (others => '0');
 signal Reset_Counter            : std_logic := '0';
 signal Enable_Comparison        : std_logic := '0';
