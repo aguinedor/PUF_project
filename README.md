@@ -47,9 +47,9 @@ In order to use the open source script, you can access it in :
 PUF_project/flow_puf/flow_FPGA
 ```
 The script is composed of three parts :  
-- **Variables Declaration** with different pathes *$TOP* *$INPUT_DIR* *$STORE_DIR*  
+- **Variables Declaration** with different paths *$TOP* *$INPUT_DIR* *$STORE_DIR*  
 
-The *Top* should correspond to the top of the design. 
+The *Top* should correspond to the top of the design.  
 The *Input_dir* is the directory with all the .vhdl files.  
 The *Store_dir* is the directory with temporary files such as logs.
 
