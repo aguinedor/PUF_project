@@ -85,18 +85,37 @@ def plot_2D_heatmap(frequencies_dict):
     x = np.arange(nb_cols + 1)
     y = np.arange(nb_lines + 1)
 
+    min_value = frequencies_dict[0]['freq1'] / 1000000
+    max_value = 0
+    '''
+    for col in range(15):
+        for line in range(50):
+            Z[line, col] = np.nan
+    '''
     for col in range(11):
         for line in range(25):
             index = col * 25 + line
             if index >= len(frequencies_dict):
                 break
-            Z[2*line, col]   = frequencies_dict[index]['freq1'] / 1000000
-            Z[2*line+1, col] = frequencies_dict[index]['freq2'] / 1000000
+            fr1 = frequencies_dict[index]['freq1'] / 1000000
+            fr2 = frequencies_dict[index]['freq2'] / 1000000
+
+            Z[2*line, col]   = fr1
+            if fr1 < min_value:
+                min_value = fr1
+            if fr1 > max_value:
+                max_value = fr1
+            Z[2*line+1, col] = fr2
+            if fr2 < min_value:
+                min_value = fr2
+            if fr2 > max_value:
+                max_value = fr2
+
 
     # Création de la figure et de l'axe
     fig, ax = plt.subplots(figsize=(8, 6))
     # Affichage avec pcolormesh
-    mesh = ax.pcolormesh(x, y, Z, shading='flat', cmap='viridis', vmin=Z.min(), vmax=Z.max())
+    mesh = ax.pcolormesh(x, y, Z, shading='flat', cmap='viridis', vmin=min_value, vmax=max_value)
     # Ajout d'une barre de couleur
     plt.colorbar(mesh, ax=ax, label="Frequency Value")
 
@@ -257,6 +276,47 @@ def plot_frequency_distribution(frequencies_dict):
     plt.grid(True)
 
 
+# Plot heatmap of bits and flits
+# -----------------------------------------------------------------------
+def plot_heatmap_bit_flips(frequencies_dict, bit_flip_index, filtering):
+    nb_cols  = 15
+    nb_lines = 25
+
+    Z = np.zeros((nb_lines, nb_cols))
+    x = np.arange(nb_cols + 1)
+    y = np.arange(nb_lines + 1)
+
+    filtering_reversed = filtering[::-1]
+    print(filtering_reversed)
+
+    for col in range(11):
+        for line in range(25):
+            index = col * 25 + line
+            if index >= len(frequencies_dict):
+                break
+            if index in bit_flip_index:
+                Z[line, col] = 10
+                print("bit flip")
+                continue
+            if filtering_reversed[index] == '0':
+                Z[line, col] = 50
+                print("filter")
+                continue
+            print("normal")
+            Z[line, col] = 100
+
+    # Création de la figure et de l'axe
+    fig, ax = plt.subplots(figsize=(8, 6))
+    # Affichage avec pcolormesh
+    mesh = ax.pcolormesh(x, y, Z, shading='flat', vmin=Z.min(), vmax=Z.max())
+    # Ajout d'une barre de couleur
+    plt.colorbar(mesh, ax=ax, label="")
+
+    # Configuration de l'axe
+    ax.set_title("Heatmap des Bitflip et filtering")
+    ax.set_xlabel("Colonnes - index X RO")
+    ax.set_ylabel("Lignes - index Y RO")
+    ax.invert_yaxis()
 
 
 # ----------------------------------------------------------------------------------------
@@ -279,6 +339,7 @@ def bit_flip_analysis(bits_dict, frequencies_dict):
     gap_max        = [0.0 for _ in range(nb_ro)]
     #liste de dictionnaires pour stocker les différentes infos lors d'un flip (son index, son gap et sa réponse)
     flip_info      = []
+    bit_flip_index = []
 
     for idx in range(nb_ro):
         for ite in range(nb_it):
@@ -289,6 +350,8 @@ def bit_flip_analysis(bits_dict, frequencies_dict):
                 # Store frequencies gap when bit flip
                 gap[idx][ite] = abs(frequencies_dict[idx]['freq1'][ite] - frequencies_dict[idx]['freq2'][ite])
                 flip_info.append({ 'index': idx, 'iteration': ite, 'difference': gap[idx][ite], 'response': bits_dict[idx][ite] })
+                if idx not in bit_flip_index:
+                    bit_flip_index.append(idx)
 
                 if gap[idx][ite] > gap[idx][ite-1]:
                     # Actualize new max gap value
@@ -296,14 +359,34 @@ def bit_flip_analysis(bits_dict, frequencies_dict):
 
     largest_gap = max(gap_max)
     flip_info = sorted(flip_info, key= lambda x: x['index'])
-
-    for entry in flip_info:
-        print(entry)
     print("The largest gap for a bit flip is: ", largest_gap)
 
+    return bit_flip_index
 
 
 
+
+def filter_bits(frequencies_dict, bit_flip_index, max_gap = 3000000):
+    nb_ro = len(frequencies_dict)
+    my_enable = ''
+
+    for idx in range(nb_ro):
+
+        if idx in bit_flip_index:           # Skip flip index
+            print("skip index")
+            my_enable = '0' + my_enable
+            continue
+
+        diff_freq = frequencies_dict[idx]['freq1'] - frequencies_dict[idx]['freq2']
+        if abs(diff_freq) > max_gap:
+            my_enable = '0' + my_enable
+            print("skip freq")
+            continue
+
+        print("store value")
+        my_enable = '1' + my_enable
+
+    return my_enable
 
 # ----------------------------------------------------------------------------------------
 #                                    MAIN AREA
@@ -319,17 +402,34 @@ def main():
 
     # Parse file
     bits_dict, frequencies_dict = parse_file(args.file, args.ring, args.time)
-    frequencies_mean = get_mean_values(frequencies_dict)
+    bits_dict_pf, frequencies_dict_pf = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_FILTERING.csv", 172, args.time)
+    #bits_dict_2, frequencies_dict_2 = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_2.csv", args.ring, args.time)
+    #bits_dict_3, frequencies_dict_3 = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_3.csv", args.ring, args.time)
+
+    frequencies_mean    = get_mean_values(frequencies_dict)
+    #frequencies_mean_pf = get_mean_values(frequencies_dict_pf)
+    #frequencies_mean_2 = get_mean_values(frequencies_dict_2)
+    #frequencies_mean_3 = get_mean_values(frequencies_dict_3)
 
     # 1 - Plot text
-    bit_flip_analysis(bits_dict, frequencies_dict)
+    bit_flip_index = bit_flip_analysis(bits_dict, frequencies_dict)
+    string_bits    = filter_bits(frequencies_mean, bit_flip_index)
 
+    print(string_bits)
     # 2 -Plot graphs
-    plot_2D_heatmap_diff_freq(frequencies_mean)
-    plot_2D_heatmap(frequencies_mean)
-    plot_gap_distribution(frequencies_dict, 1)
+    #plot_2D_heatmap_diff_freq(frequencies_mean)
+    #plot_2D_heatmap(frequencies_mean)
+    #plot_gap_distribution(frequencies_dict, 1)
+
+    #plot_2D_heatmap(frequencies_mean)
     plot_histogram(bits_dict)
-    plot_frequency_distribution(frequencies_dict)
+    plot_heatmap_bit_flips(frequencies_mean, bit_flip_index, string_bits)
+    plot_histogram(bits_dict_pf)
+
+
+    #plot_histogram(bits_dict_2)
+    #plot_histogram(bits_dict_3)
+    #plot_frequency_distribution(frequencies_dict)
     plt.show()
 
 

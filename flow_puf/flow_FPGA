@@ -91,7 +91,6 @@ if [ "$GHDL_ON" -eq 1 ]; then
     # ghdl -m --std=08 -fsynopsys --warn-all --work=unisim --workdir=$STORE_DIR $TOP
 
     # ---------- New version
-    # TODO Difference STORE_DIR
     ghdl analyze --std=08 -fsynopsys --workdir=$STORE_DIR $INPUT_DIR/*vhd
     ghdl synth --std=08 -fsynopsys --workdir=$STORE_DIR --out=verilog $TOP > $STORE_DIR/$TOP.v
 fi
@@ -155,27 +154,25 @@ fi
 if [ "$NEXT_PNR_IS_ON" -eq 1 ]; then
     echo -e "\n3 - next-pnr Xilinx"
 
-    CHIPDB=flow_puf/xc7s50csga324-1.bin
+
     FILENAME_NETLIST=$STORE_DIR/$TOP.json
     FILENAME_ROUTED=$STORE_DIR/${TOP}_routed.json
     FILENAME_FASM=$STORE_DIR/$TOP.fasm
     XDC=flow_puf/$TOP.xdc
 
-    # check database : --test
-    # checker        : --no-tmdriv --timing-allow-fail --ignore-rel-clk
+    SCRIPT_PATH=./../nextpnr-xilinx/nextpnr-xilinx
+    CHIPDB=flow_puf/xc7s50csga324-1.bin
 
-    ./../nextpnr-xilinx/nextpnr-xilinx -l $STORE_DIR/nextpnr.log \
+
+    $SCRIPT_PATH -l $STORE_DIR/nextpnr.log \
     --debug --ignore-loops --ignore-rel-clk --no-tmdriv --Werror --chipdb $CHIPDB \
     --xdc $XDC --json $FILENAME_NETLIST  --write $FILENAME_ROUTED \
     --fasm $FILENAME_FASM --router router1
 fi
 
 
-
-
-# ------------------------------------------------------------
-# Process the JSON in Nextpnr-Xilinx to create FASM file
-
+# check database : --test
+    # checker        : --no-tmdriv --timing-allow-fail --ignore-rel-clk
 
 fi
 
