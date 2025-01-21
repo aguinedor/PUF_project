@@ -53,7 +53,8 @@ The *Top* should correspond to the top of the design.
 The *Input_dir* is the directory with all the .vhdl files.  
 The *Store_dir* is the directory with temporary files such as logs.
 
-- **Args parsing** is used to support both three tools :  
+- **Args parsing** is used to support both three tools :
+
 *--ghdl*  *--yosys*  *--nextpnr*
   
 - **Script execution** performs the different commands.
