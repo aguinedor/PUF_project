@@ -402,7 +402,7 @@ def main():
 
     # Parse file
     bits_dict, frequencies_dict = parse_file(args.file, args.ring, args.time)
-    bits_dict_pf, frequencies_dict_pf = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_FILTERING.csv", 172, args.time)
+    bits_dict_pf, frequencies_dict_pf = parse_file("data/RO_PUF_172_FILTERING.csv", 172, args.time)
     #bits_dict_2, frequencies_dict_2 = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_2.csv", args.ring, args.time)
     #bits_dict_3, frequencies_dict_3 = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_3.csv", args.ring, args.time)
 
@@ -417,11 +417,11 @@ def main():
 
     print(string_bits)
     # 2 -Plot graphs
-    #plot_2D_heatmap_diff_freq(frequencies_mean)
+    plot_2D_heatmap_diff_freq(frequencies_mean)
     #plot_2D_heatmap(frequencies_mean)
-    #plot_gap_distribution(frequencies_dict, 1)
+    plot_gap_distribution(frequencies_dict, 1)
 
-    #plot_2D_heatmap(frequencies_mean)
+    plot_2D_heatmap(frequencies_mean)
     plot_histogram(bits_dict)
     plot_heatmap_bit_flips(frequencies_mean, bit_flip_index, string_bits)
     plot_histogram(bits_dict_pf)
@@ -429,7 +429,7 @@ def main():
 
     #plot_histogram(bits_dict_2)
     #plot_histogram(bits_dict_3)
-    #plot_frequency_distribution(frequencies_dict)
+    plot_frequency_distribution(frequencies_dict)
     plt.show()
 
 
