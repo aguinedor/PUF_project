@@ -24,9 +24,10 @@ MAX_TIME               = BAUD_TIME_TRANSMISSION
 parser = argparse.ArgumentParser(description="Communication PUF 256 : Send the frame to the fpga")
 # Add args
 parser.add_argument('--frame'     , type=str, default='10000001'    , help='Select the 8bits frame to send' , required=True)
+parser.add_argument('--bits_resp' , type=str, help='Select nb of response we expect' , required=True)
 parser.add_argument('--uart_port' , type=str, default='/dev/ttyUSB0', help='Select the uart port to connect', required=True)
 parser.add_argument('--output_csv', type=str, default='/tp/xph3app/xph3app605/PUF_PROJECT/Output_fpga_puf/RO_PUF.csv', help='Select the counter output csv file ', required=False)
-parser.add_argument('--response_csv', type=str, default='/tp/xph3app/xph3app605/PUF_PROJECT/Output_fpga_puf/RO_PUF_RESPONSE.csv', help='Select the response output csv file', required=False)
+
 # Parse args
 args = parser.parse_args()
 # Access the arguments
@@ -45,12 +46,10 @@ ser = serial.Serial(args.uart_port, 9600, timeout=UART_TIMEOUT_SEC)
 # Attendre que le port série soit prêt
 ser.reset_input_buffer()
 
-
-
 # -----------------------------------------------------------------
 #                     FRAME Setup section
 # -----------------------------------------------------------------
-data_to_send_list = [args.frame] 
+data_to_send_list = [args.frame]
 print(data_to_send_list)
 # [7]   => PUF_START, , , , ,counter_timer[0],counter_timer[1], counter_timer[2]] -> "001":12000000, "010":1200000, "011":120000, "100": 12000
 # [6]   => Mode_select (1: random; 0: pear to pear)
@@ -68,7 +67,6 @@ def send_data(bits_str):
     print(f"Data sent: {data_bytes.hex()}")
 # Envoyer les données initiales
 send_data(data_to_send_list[0])
-
 
 
 # -----------------------------------------------------------------
@@ -96,6 +94,8 @@ start_time = time.time()
 # -----------------------------------------------------------------
 CPT_BIT = 0
 response_value = ""
+nb_response = "everything ok !"
+max_value_bits = int(args.bits_resp)
 # Lire les données de l'UART en continu pendant 900 secondes (15 minutes)
 while True:
     try:
@@ -105,10 +105,12 @@ while True:
         progress_bar.refresh()
 
         # Vérifier si 900 secondes (15 minutes) se sont écoulées
-        if elapsed_time > MAX_TIME + 1:
-            print(f"\nTemps écoulé : {MAX_TIME} secondes")
-            break
-      
+        #if elapsed_time > MAX_TIME + 1:
+            #print(f"\nTemps écoulé : {MAX_TIME} secondes")
+            #if(CPT_BIT != 255):
+            #    nb_response = f"ended sooner ! {CPT_BIT} responses"
+            #break
+
         # Lire un bloc de données de l'UART
         data = ser.read(BYTES_TO_READ)
 
@@ -120,13 +122,13 @@ while True:
         # Si la longueur des données lues est inférieure à BYTES_TO_READ, remplir avec des zéros
         if len(data) < BYTES_TO_READ:
             data += bytes(BYTES_TO_READ - len(data))
-        
+
         # Afficher les données lues sous forme binaire sur 64 bits
         binary_data = format(int.from_bytes(data, byteorder='big'), '064b')
-        
+
         # Extraire la réponse du PUF (bit de poids fort)
         puf_response = binary_data[0]
-        
+
         # Extraire la différence du compteur (bits de 6 à 0)
         counter_difference2 = int(binary_data[1:33], 2)  # Conversion binaire en décimal
         counter_difference1 = int(binary_data[33:] , 2)  # Conversion binaire en décimal
@@ -139,23 +141,18 @@ while True:
             writer.writerow([puf_response, counter_difference1, counter_difference2])
 
         response_value = response_value + puf_response
-            
-        if CPT_BIT > 255:
+
+        if CPT_BIT > (max_value_bits - 1):
             break
-		
+
     except KeyboardInterrupt:
         # Quitter la boucle en cas d'interruption du clavier (CTRL+C)
         break
 
-#if data_to_send_list[0][1]:
-with open(args.response_csv, 'a', newline='') as file2:
-    writer = csv.writer(file2)
-    writer.writerow([response_value])
-#else:
-    #with open(args.response_csv, 'a', newline='') as file3:
-        #writer = csv.writer(file3)
-        #writer.writerow([response_value])
-            
+with open("verification_bits.csv", 'a', newline='') as file3:
+    writer = csv.writer(file3)
+    writer.writerow([nb_response])
+
 # Fermer le port série à la fin
 ser.close()
 

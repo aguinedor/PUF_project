@@ -1,21 +1,23 @@
-# Dependencies 
+# Dependencies
 import argparse
 import subprocess
 import os
-# TODO clean this
-import filter_functions
-from filter_functions import load_csv
-from filter_functions import RO_pair_filter
-from replace_function import replace_RO
-from replace_function import init_RO
+
+import PUF_project.python.data_ro_parser as data_ro_parser
+import PUF_project.python.filter_functions as filter_functions
+
 
 # --------------------------------------------------
-#               Global variables 
-VIVADO_TCL_SCRIPT  = '/tp/xph3app/xph3app605/PUF_PROJECT/Script_puf/Script_vivado/vivado_flow.tcl'
-OUTPUT_CSV_FILE    = '/tp/xph3app/xph3app605/PUF_PROJECT/Output_fpga_puf/RO_PUF_GUINEDOR_ADRIEN.csv'
-TOP_VHDL_PATH      = '/tp/xph3app/xph3app605/PUF_PROJECT/sources/Code_vhdl_puf/ro_puf_top.vhd'
-OUTPUT_CSV_FILE_2  = '/tp/xph3app/xph3app605/PUF_PROJECT/Output_fpga_puf/RO_PUF_CORRECTED.csv'
+#               Global variables
+OUTPUT_DATA_PATH   = '/tp/xph3app/xph3app605/PUF_PROJECT/Output_fpga_puf'
 SCRIPT_PYTHON_PATH = '/tp/xph3app/xph3app605/PUF_PROJECT/Script_puf/Script_Python'
+TOP_VHDL_PATH      = '/tp/xph3app/xph3app605/PUF_PROJECT/sources/Code_vhdl_puf/ro_puf_top.vhd'
+VIVADO_TCL_SCRIPT  = '/tp/xph3app/xph3app605/PUF_PROJECT/Script_puf/Script_vivado/vivado_flow.tcl'
+
+OUTPUT_CSV_FILE    = 'RO_PUF_BEFORE.csv'
+OUTPUT_CSV_FILE_2  = 'RO_PUF_AFTER.csv'
+
+
 
 # Create the parser
 parser = argparse.ArgumentParser(description="Global PUF : run the whole script for PUF implementation")
@@ -34,7 +36,10 @@ parser.add_argument('--speed'    , type=str , default='011', choices=['001', '01
                          '\n  default: 011')
 
 # Parse the arguments
-args = parser.parse_args()
+args              = parser.parse_args()
+USB_PORT          = args.uart_port
+TRAME_TO_SEND_STR = '1'+args.puf_mode+'000'+args.speed
+
 
 # Access the arguments
 print("- 0 - Global Informations ------------------------------------------------------------------------------")
@@ -43,21 +48,10 @@ print(f"Filter enabled : {args.filter}")
 print(f"UART Port      : {args.uart_port}")
 print(f"PUF Mode       : {args.puf_mode}")
 print(f"Speed          : {args.speed}")
-
-
-
-USB_PORT          = args.uart_port
-TRAME_TO_SEND_STR = '1'+args.puf_mode+'000'+args.speed
 print(f"Result Frame   : {TRAME_TO_SEND_STR}")
 
-print(f"")
-print(f" VIVADO_TCL_SCRIPT : {VIVADO_TCL_SCRIPT}")
-print(f" OUTPUT_CSV_FILE   : {OUTPUT_CSV_FILE}")
-print(f" TOP_VHDL_PATH     : {TOP_VHDL_PATH}")
-print(f" OUTPUT_CSV_FILE_2 : {OUTPUT_CSV_FILE_2}")
 
 # remove files
-"""
 try:
     os.remove(OUTPUT_CSV_FILE)
     print(f"File {OUTPUT_CSV_FILE} deleted successfully.")
@@ -69,56 +63,61 @@ try:
     print(f"File {OUTPUT_CSV_FILE_2} deleted successfully.")
 except FileNotFoundError:
     print(f"File {OUTPUT_CSV_FILE_2} not found.")
-"""
 
-
-# [7]   => PUF_START, , , , ,counter_timer[0],counter_timer[1], counter_timer[2]] -> "001":12000000, "010":1200000, "011":120000, "100": 12000
-# [6]   => Mode_select (1: random; 0: pear to pear)
-# [5:3] => Not used
-# ------------------------------------------------------------------
-# [2:0] => [counter_timer[2] counter_timer[1] counter_timer[0]]
-# "001":12000000
-# "010":1200000
-# "011":120000
-# "100": 12000
 
 
 # ------------------------------------------------------------------
 # 1 - Run -- Reinitialisation of ro_puf
-print("\n- 1 - Launch vivado ------------------------------------------------------------------------------------\n")
-#init_RO(TOP_VHDL_PATH, "signal ro_filter ")
+print("\n- 1 - Launch init RO ------------------------------------------------------------------------------------\n")
+filter_functions.init_RO(TOP_VHDL_PATH, "signal ro_filter ")
 
 
 # ------------------------------------------------------------------
 # 2 - Run -- Vivado script
-#if (args.vivado):
-    #print("\n- 2 - Launch vivado ------------------------------------------------------------------------------------\n")
-
-    #subprocess.run(['vivado', '-mode', 'batch', '-source', VIVADO_TCL_SCRIPT])
+if (args.vivado and not args.filter):
+    print("\n- 2 - Launch vivado ------------------------------------------------------------------------------------\n")
+    subprocess.run(['vivado', '-mode', 'batch', '-source', VIVADO_TCL_SCRIPT])
 
 
 # ------------------------------------------------------------------
-# 3 - Run -- Communication_PUF_256.py
-
-print("\n- 3 - Launch Communication_PUF_256.py ------------------------------------------------------------------\n")
-#subprocess.run(['python3', SCRIPT_PYTHON_PATH+'/Communication_PUF_256.py', '--frame', TRAME_TO_SEND_STR, '--uart_port', USB_PORT, '--output_csv', OUTPUT_CSV_FILE])
+# 3 - Run -- Communication_PUF.py
+print("\n- 3 - Launch Communication_PUF.py ------------------------------------------------------------------\n")
+subprocess.run(['python3', SCRIPT_PYTHON_PATH+'/Communication_PUF.py', '--frame', TRAME_TO_SEND_STR, '--bits_resp', "256", '--uart_port', USB_PORT, '--output_csv', OUTPUT_DATA_PATH+OUTPUT_CSV_FILE])
 
 
 # ------------------------------------------------------------------
 # 4 - Run -- Filter_functions (select correct blocks)
-print("\n- 4 - Launch Filter_functions.py -----------------------------------------------------------------------\n")
-
 if (args.filter):
-    loaded_results_csv = load_csv(OUTPUT_CSV_FILE)
-    filtered_pairs     = filter_functions.RO_pair_filter(loaded_results_csv, args.speed)
+    print("\n- 4 - Launch filter.py -----------------------------------------------------------------------\n")
+
+    # parse timing
+    match args.speed:
+        case "001":
+            timing_wait = 1000
+        case "010":
+            timing_wait = 100
+        case "011":
+            timing_wait = 10
+        case "100":
+            timing_wait = 1
+
+    # load results in a file
+    bits_dict, frequencies_dict = data_ro_parser.parse_file(OUTPUT_DATA_PATH+OUTPUT_CSV_FILE, 256, timing_wait)
+    frequencies_dict_mean       = data_ro_parser.get_mean_values(frequencies_dict)
+
+    # Extract a bit flip dict with index
+    bit_flip_index, largest_gap = filter_functions.get_gap_bit_flip(bits_dict, frequencies_dict)
+
+    # Generate a string with constraints
+    gap_bit_flip   = largest_gap
+    gap_aliasing   = None
+    filtered_pairs = filter_functions.RO_pair_filter(frequencies_dict_mean, bit_flip_index, gap_bit_flip, gap_aliasing)
+
+    # Replace the string in the top_VHDL
+    number_of_ones = filter_functions.replace_RO_line(TOP_VHDL_PATH, "signal ro_filter ", filtered_pairs)
+
+    print(f"Size of new response expected : {number_of_ones}")
     print(filtered_pairs)
-
- 	
-# ------------------------------------------------------------------
-# 5 - Run -- replace_RO (modify code)
-print("\n- 5 - Launch replace_RO.py ----------------------------------------------------------------------\n")
-if (args.filter):
-    replace_RO(TOP_VHDL_PATH, "signal ro_filter ", filtered_pairs)
 
 
 # ------------------------------------------------------------------
@@ -129,13 +128,17 @@ if (args.vivado and args.filter):
 
 
 # ------------------------------------------------------------------
-# 7 - Run -- Communication_PUF_256.py
-print("\n- 7 - Launch Communication_PUF_256.py ------------------------------------------------------------------\n")
-
-#if (args.filter):
-    #subprocess.run(['python3', SCRIPT_PYTHON_PATH+'/Communication_PUF_256.py', '--frame', TRAME_TO_SEND_STR, '--uart_port', USB_PORT, '--output_csv', OUTPUT_CSV_FILE_2])
-
+# 7 - Run -- Communication_PUF.py
+if (args.vivado and args.filter):
+    print("\n- 7 - Launch Communication_PUF.py ------------------------------------------------------------------\n")
+    subprocess.run(['python3', SCRIPT_PYTHON_PATH+'/Communication_PUF.py', '--frame', TRAME_TO_SEND_STR, '--bits_resp', str(number_of_ones), '--uart_port', USB_PORT, '--output_csv', OUTPUT_DATA_PATH+OUTPUT_CSV_FILE_2])
 
 
-
+# ------------------------------------------------------------------
+# 8 - Plot data at end
+if (args.filter):
+    print(f"pairs used is now : {filtered_pairs}")
+    print(f"END of program - size of response expected : {number_of_ones}")
+    print(f"Gap_bit_flip used : {gap_bit_flip}")
+    print(f"Use it as args for script <run_multiple_response>")
 

@@ -1,87 +1,155 @@
-import csv
+# get_gap_bit_flip()
+# - bits_dict        [index][bit0, bit1, bit2 ...]
+# - frequencies_dict [index]{'freq1' = [resp0, resp1 ...], 'freq2' = [resp0, resp1 ...]}
+#
+# -----------------------------------------------------------------------
+def get_gap_bit_flip(bits_dict, frequencies_dict):
+    nb_ro = len(frequencies_dict)
+    nb_it = len(frequencies_dict[0]['freq1'])
 
-#definition of a function for loading csv files
-def load_csv(file_path):
-    cv_array = [] #initialize cv_array before writting in it
+    # Store gaps for each index and iteration
+    gap            = [[0.0 for _ in range(nb_it)] for _ in range(nb_ro)]
+    # Store max_value of gap for each index
+    gap_max        = [0.0 for _ in range(nb_ro)]
 
-    try:
-        #Load counter values from csv file to cv_array
-        with open(file_path, 'r') as file: #open csv file in reading mode
-            reader = csv.reader(file) #create an object reader to read file csv row by row
-            for row in reader:
-                #handling errors for invalid lines ex: lines with characters and no numbers
-                if len(row) == 3:
-                    try:
-                        cv_array.append([int(row[1]), int(row[2])]) #add every line in a list of integers, but only column 2 and 3 that are counter values, the 1st is the challenge bit outpur and we don't care about it
-                                                                #bidimensional array [N_RO_pair][2] Every line has 2 colums containing values of the 2 counters for a RO pair
-                    except ValueError:
-                        print("Error: impossible to convert", row, " in integer \n") #error if it's not possible to convert in integer
-                else:
-                    print("Error: line invalid", row, " does not have 3 columns \n") #error if there is a number of column different than 3 <=> bad line => possibly bad input file
+    flip_info      = []
+    bit_flip_index = []
 
-        #Handling errors if csv file is empty or completely invalid    
-        if not cv_array:
-            print("Error: csv file empty or not valid \n")
-            exit()
-    
-    except FileNotFoundError:
-        print("Error: file", file_path, "is not found \n")
-        exit()
+    for idx in range(nb_ro):
+        for ite in range(nb_it):
+            if ite == 0:
+                continue
 
-    return cv_array
+            if bits_dict[idx][ite] != bits_dict[idx][ite-1]:
+                diff_freq = frequencies_dict[idx]['freq1'][ite] - frequencies_dict[idx]['freq2'][ite]
+                # Store frequencies gap when bit flip
+                gap[idx][ite] = abs(diff_freq)
+                flip_info.append({ 'index': idx, 'iteration': ite, 'difference': gap[idx][ite], 'response': bits_dict[idx][ite] })
+
+                if idx not in bit_flip_index:
+                    bit_flip_index.append(idx)
+                # Actualize new max gap value
+                if gap[idx][ite] > gap[idx][ite-1]:
+                    gap_max[idx] = gap[idx][ite]
+
+    largest_gap = max(gap_max)
+    flip_info = sorted(flip_info, key= lambda x: x['index'])
+    print("The largest gap for a bit flip is: ", largest_gap)
+
+    return bit_flip_index, largest_gap
 
 
-#definition of a function  for filtering
-def RO_pair_filter(cv_array, speed, gap_min=20, gap_max=31000000000000000, filter_value=15000): #if threshold values and filter value are not declare, this is done automatically with arbitrary values [TO DETERMINE AND VERIFY]
-    N_RO_pair = len(cv_array) #number of RO pairs, depending on how many rows there are in our array
 
-    filtered_pairs_array = [] #creating list
-    filtered_pairs = "" #creating output, I created an empty string (string is a character list)
+# RO_pair_filter()
+# - frequencies_mean [index]{'freq1' = mean, 'freq2' = mean}
+# - bit_flip_index   [index] if they exists
+#
+# 1 - gap_bit_flip = <value>                            -> Remove bit_flip_gap (no aliasing)
+# 2 - gap_bit_flip = None  AND  gap_aliasing = <value>  -> Remove bit_flip and gap aliasing
+# 3 - gap_bit_flip = None  AND  gap_aliasing = None     -> Remove bit_flip (no aliasing)
+# -----------------------------------------------------------------------
+def RO_pair_filter(frequencies_mean, bit_flip_index, gap_bit_flip = None, gap_aliasing = None):
+    nb_ro = len(frequencies_mean)
 
-    print(speed)    
+    filtered_pairs = ''
 
-    #converting speed of transmission into time of transmission
-    if speed == "001":
-        time = 1
-    elif speed == "010":
-        time = 0.1
-    elif speed == "011":
-        time = 0.01
-    elif speed == "100":
-        time = 0.001
+    for idx in range(nb_ro):
+        diff_freq = frequencies_mean[idx]['freq1'] - frequencies_mean[idx]['freq2']
 
-    print(time)
-    
-    #loop to filter according to threshold values
-    for i in range(N_RO_pair): #for(int i=0; i < N-RO_pair; i++)
-        cv1, cv2 = cv_array[i] #assigning 2 values of a pair to variables cv1 and cv2 
-        #converting counter values to counter frequencies to compare with whatever simulation time
-        cf1 = cv1/time
-        cf2 = cv2/time
-        if gap_min <= abs(cf1 - cf2) <= gap_max: #we check if all counter values of the RO pair challenge are good (inside thresholds)
-            filtered_pairs_array.insert(0,1) #if both are good then the pair can be used. So we write a 1 to indicate that it's a good RO pair
-        else: #if not for the first, there is at least one counter value outside thresholds 
-            filtered_pairs_array.insert(0,0) #so we can write a 0, because that's a bad pair #insert to add always at the beggining
-    
-    print("Number of RO pair valid after threshold filter = ", filtered_pairs_array.count(1), " \n ")
+        # 1 - first mode
+        if gap_bit_flip != None:
+            if abs(diff_freq) < gap_bit_flip:
+                filtered_pairs = '0' + filtered_pairs
+            else:
+                filtered_pairs = '1' + filtered_pairs
+            continue
 
-    #loop to filter too much close counter values
-    for j in range(N_RO_pair):
-        if filtered_pairs_array[j] == 1: #to test only good RO pairs, because if not there is not need to test them again
-            cv1, cv2 = cv_array[j]
-            cf1 = cv1/time
-            cf2 = cv2/time
-            if abs(cf1 - cf2) < filter_value: #to check if counter values are too much close
-                filtered_pairs_array[j] = 0 #to indicate that RO pair is bad in case of cv too close, even if there are inside thresholds
- 
-    print("Number of RO pair valid = ", filtered_pairs_array.count(1), " \n ")
-    print("This corresponds to this proportion : ", (filtered_pairs_array.count(1)/N_RO_pair)*100, " \n ")
+        # 2 - second mode
+        if gap_bit_flip == None and gap_aliasing != None:
+            if idx in bit_flip_index or abs(diff_freq) > gap_aliasing:
+                filtered_pairs = '0' + filtered_pairs
+            else:
+                filtered_pairs = '1' + filtered_pairs
+            continue
 
-    for k in range (len(filtered_pairs_array)):
-        if filtered_pairs_array[k] == 1:
-            filtered_pairs = filtered_pairs + "1"
-        elif filtered_pairs_array[k] == 0:
-            filtered_pairs = filtered_pairs + "0"
+        # 3 - third mode
+        if gap_bit_flip == None and gap_aliasing == None:
+            if idx in bit_flip_index:
+                filtered_pairs = '0' + filtered_pairs
+            else :
+                filtered_pairs = '1' + filtered_pairs
+            continue
 
     return filtered_pairs
 
+
+
+# reset_RO_to_ones()
+# - file_path       =  top_vhdl_path
+# - text_to_change  =  line to select
+# This function reset the given line in order to set only ones for example :
+# - signal ro_filter : std_logic_vector(256 downto 0) := (others => '1')
+# -----------------------------------------------------------------------
+def reset_RO_to_ones(file_path, text_to_change):
+    try:
+        with open(file_path, 'r') as f:     # open file in readmode to load each line in elements of a list
+            lines = f.readlines()
+
+        modified_lines = []                 # to save all lines (unchanged ones and the changed line in write order)
+        substitution = ("signal ro_filter                : std_logic_vector(256 downto 0) := (others => '1');\n") #text of substitution: initialisation of a signal taking into account the filter_output
+
+        for line in lines:                  # browse all lines of file
+            if text_to_change in line:      # if yes we found the line to change
+                line = substitution
+            modified_lines.append(line)     # save each line one by one (unchanged and change ones)
+
+        with open(file_path, 'w') as f:     # rewrite all file with the changed line
+            f.writelines(modified_lines)
+            print("Substitution done, now all ROs are enabled\n")
+
+    except FileNotFoundError:               # if it's not possible to load file
+        print("Error: file", file_path, "is not found \n")
+        exit()
+
+    except Exception as e:                  # if error has occured
+        print("Error: ", e, "error occured \n")
+        exit()
+    return
+
+
+
+# replace_RO()
+# - file_path       =  top_vhdl_path
+# - text_to_change  =  line to select
+# - filter_output   =  string of 256 values to filter
+# This function replace
+# -----------------------------------------------------------------------
+def replace_RO_line(file_path, text_to_change, filter_output):
+    # To check if filtering has an effect, if not we don't need to change RO activtions
+    if filter_output.count("0") == 0:
+        print("Nothing to change, all ROs are enabled \n")
+        exit()
+    else:
+        try:
+            with open(file_path, 'r') as f:
+                lines = f.readlines()
+
+            modified_lines = []
+            substitution = ("signal ro_filter                : std_logic_vector(255 downto 0) := " + "\"" + str(filter_output) + "\"" + ";\n") #text of substitution: initialisation of a signal taking into account the filter_output
+
+            for line in lines:                  # browse all lines of file
+                if text_to_change in line:      # if yes we found the line to change
+                    line = substitution
+                modified_lines.append(line)     # save each line one by one (unchanged and change ones)
+
+            with open(file_path, 'w') as f:     # rewrite all file with the changed line
+                f.writelines(modified_lines)
+
+        except FileNotFoundError:               # if it's not possible to load file
+            print("Error: file", file_path, "is not found \n")
+            exit()
+
+        except Exception as e:                  # if error has occured
+            print("Error: ", e, "error occured \n")
+
+    return filter_output.count("1")

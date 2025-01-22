@@ -5,75 +5,11 @@ import numpy as np
 from collections import Counter
 import argparse
 
-
-# ----------------------------------------------------------------------------------------
-#                             DATA AREA
-
-
-# parse_line()
-# - input time spent in ms
-# - return response, frequency1, frequency2
-# -----------------------------------------------------------------------
-def parse_line(line, time_spent=10):
-    parts = line.strip().split(',')
-    if len(parts) != 3:
-        raise ValueError("La ligne doit contenir exactement trois valeurs séparées par des virgules.")
-    response   = int(parts[0])
-    frequency1 = float(parts[1]) * (1000 / time_spent)
-    frequency2 = float(parts[2]) * (1000 / time_spent)
-    return response, frequency1, frequency2
-
-
-# parse_file()
-# - bits_dict        -> return [index][bit0, bit1, bit2 ...]
-# - frequencies_dict -> return [index]{'freq1' = [resp0, resp1 ...], 'freq2' = [resp0, resp1 ...]}
-# -----------------------------------------------------------------------
-def parse_file(file_path, nb_ro = 256, time_spent=10):
-    current_index    = 0
-    frequencies_dict = [{'freq1': [], 'freq2': []}   for _ in range(nb_ro)]
-    bits_dict        = [[] for _ in range(nb_ro)]
-
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
-        # Vérifier si le nombre de lignes est un multiple du nombre de RO activées
-        if len(lines) % nb_ro != 0:
-            raise ValueError("Le fichier doit contenir un nombre de lignes multiple de " + nb_ro)
-
-        # Traiter chaque ligne
-        for line in lines:
-
-            response, frequency1, frequency2 = parse_line(line, time_spent)
-            frequencies_dict[current_index]['freq1'].append(frequency1)
-            frequencies_dict[current_index]['freq2'].append(frequency2)
-            bits_dict[current_index].append(response)
-
-            current_index += 1
-            if current_index == nb_ro:
-                current_index = 0
-    return bits_dict, frequencies_dict
-
-
-# get_mean_values()
-# - return [index]{'freq1' = mean, 'freq2' = mean}
-# -----------------------------------------------------------------------
-def get_mean_values(frequencies_dict):
-    nb_ro = len(frequencies_dict)
-    frequencies_mean = [{'freq1': 0, 'freq2': 0}   for _ in range(nb_ro)]
-
-    for i in range(nb_ro):
-        if frequencies_dict[i]['freq1']:  # Avoid the division by zero
-            frequencies_mean[i]['freq1'] = np.mean(frequencies_dict[i]['freq1'])
-        if frequencies_dict[i]['freq2']:
-            frequencies_mean[i]['freq2'] = np.mean(frequencies_dict[i]['freq2'])
-
-    return frequencies_mean
-
-
+import PUF_project.python.data_ro_parser as data_ro_parser
 
 
 # ----------------------------------------------------------------------------------------
 #                             PLOTTING AREA
-
 
 # Plot 2D graph of frequencies heatmap
 # -----------------------------------------------------------------------
@@ -229,13 +165,12 @@ def plot_histogram(bits_dict, white='yes'):
     # Affichage avec pcolormesh
     mesh = ax.pcolormesh(x, y, Z, shading='flat', cmap='viridis', vmin=Z.min(), vmax=Z.max())
     # Ajout d'une barre de couleur
-    plt.colorbar(mesh, ax=ax, label="Frequency Value")
+    plt.colorbar(mesh, ax=ax, label="bit value")
 
     # Configuration de l'axe
     ax.set_title("Heatmap of response with iteration")
     ax.set_xlabel("Colonnes - index X response")
     ax.set_ylabel("Lignes - index Y iteration")
-
 
 
 # Frequency distribution
@@ -300,9 +235,7 @@ def plot_heatmap_bit_flips(frequencies_dict, bit_flip_index, filtering):
                 continue
             if filtering_reversed[index] == '0':
                 Z[line, col] = 50
-                print("filter")
                 continue
-            print("normal")
             Z[line, col] = 100
 
     # Création de la figure et de l'axe
@@ -317,6 +250,8 @@ def plot_heatmap_bit_flips(frequencies_dict, bit_flip_index, filtering):
     ax.set_xlabel("Colonnes - index X RO")
     ax.set_ylabel("Lignes - index Y RO")
     ax.invert_yaxis()
+
+
 
 
 # ----------------------------------------------------------------------------------------
@@ -364,29 +299,23 @@ def bit_flip_analysis(bits_dict, frequencies_dict):
     return bit_flip_index
 
 
-
-
 def filter_bits(frequencies_dict, bit_flip_index, max_gap = 3000000):
     nb_ro = len(frequencies_dict)
     my_enable = ''
 
     for idx in range(nb_ro):
-
-        if idx in bit_flip_index:           # Skip flip index
-            print("skip index")
+        if idx in bit_flip_index:
             my_enable = '0' + my_enable
             continue
-
         diff_freq = frequencies_dict[idx]['freq1'] - frequencies_dict[idx]['freq2']
         if abs(diff_freq) > max_gap:
             my_enable = '0' + my_enable
-            print("skip freq")
             continue
-
-        print("store value")
         my_enable = '1' + my_enable
 
     return my_enable
+
+
 
 # ----------------------------------------------------------------------------------------
 #                                    MAIN AREA
@@ -401,35 +330,22 @@ def main():
     args = parser.parse_args()
 
     # Parse file
-    bits_dict, frequencies_dict = parse_file(args.file, args.ring, args.time)
-    bits_dict_pf, frequencies_dict_pf = parse_file("data/RO_PUF_172_FILTERING.csv", 172, args.time)
-    #bits_dict_2, frequencies_dict_2 = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_2.csv", args.ring, args.time)
-    #bits_dict_3, frequencies_dict_3 = parse_file("data/RO_PUF_GUINEDOR_ADRIEN_3.csv", args.ring, args.time)
+    bits_dict, frequencies_dict = data_ro_parser.parse_file(args.file, args.ring, args.time)
 
-    frequencies_mean    = get_mean_values(frequencies_dict)
-    #frequencies_mean_pf = get_mean_values(frequencies_dict_pf)
-    #frequencies_mean_2 = get_mean_values(frequencies_dict_2)
-    #frequencies_mean_3 = get_mean_values(frequencies_dict_3)
+    frequencies_mean    = data_ro_parser.get_mean_values(frequencies_dict)
 
     # 1 - Plot text
     bit_flip_index = bit_flip_analysis(bits_dict, frequencies_dict)
     string_bits    = filter_bits(frequencies_mean, bit_flip_index)
 
-    print(string_bits)
     # 2 -Plot graphs
     plot_2D_heatmap_diff_freq(frequencies_mean)
-    #plot_2D_heatmap(frequencies_mean)
     plot_gap_distribution(frequencies_dict, 1)
-
     plot_2D_heatmap(frequencies_mean)
     plot_histogram(bits_dict)
     plot_heatmap_bit_flips(frequencies_mean, bit_flip_index, string_bits)
-    plot_histogram(bits_dict_pf)
 
-
-    #plot_histogram(bits_dict_2)
-    #plot_histogram(bits_dict_3)
-    plot_frequency_distribution(frequencies_dict)
+    #plot_frequency_distribution(frequencies_dict)
     plt.show()
 
 
